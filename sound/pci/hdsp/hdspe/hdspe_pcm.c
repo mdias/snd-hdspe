@@ -233,31 +233,30 @@ static snd_pcm_uframes_t snd_hdspe_hw_pointer(struct snd_pcm_substream
 
 static int snd_hdspe_reset(struct snd_pcm_substream *substream)
 {
-	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct hdspe *hdspe = snd_pcm_substream_chip(substream);
-	struct snd_pcm_substream *other;
-
-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-		other = hdspe->capture_substream;
-	else
-		other = hdspe->playback_substream;
-
-	if (hdspe->running)
-		runtime->status->hw_ptr = hdspe_hw_pointer(hdspe);
-	else
-		runtime->status->hw_ptr = 0;
-
-	if (other) {
+	
+	/* Since our hardware never stops it's buffer pointer from moving forwards, when
+	 * the audio stream is about to start we want to update the runtime hw_ptr to
+	 * have the latest available position so that the application pointer gets set
+	 * correctly to copy the audio data to the very near future, and potentially
+	 * avoid a series of xruns.*/
+	if (!hdspe->running)
+	{
 		struct snd_pcm_substream *s;
-		struct snd_pcm_runtime *oruntime = other->runtime;
+		snd_pcm_uframes_t hw_ptr;
+
+		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+			hdspe_silence_playback(hdspe);
+	
+		hw_ptr = hdspe_hw_pointer(hdspe);
+
 		snd_pcm_group_for_each_entry(s, substream) {
-			if (s == other) {
-				oruntime->status->hw_ptr =
-					runtime->status->hw_ptr;
-				break;
-			}
+			struct snd_pcm_runtime *runtime = s->runtime;
+			runtime->status->hw_ptr = hw_ptr;
+			/* do we need to also set runtime->status->hw_ptr_wrap? */
 		}
 	}
+
 	return 0;
 }
 
