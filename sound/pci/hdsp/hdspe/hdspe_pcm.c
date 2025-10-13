@@ -208,6 +208,23 @@ void hdspe_update_frame_count(struct hdspe* hdspe)
 #endif /*DEBUG_FRAME_COUNT*/
 }
 
+void hdspe_update_running_status(struct hdspe *hdspe, int new_running_status)
+{
+	const bool was_running = !!hdspe->running;
+	const bool is_running = !!new_running_status;
+	union hdspe_status0_reg  status0;
+
+	hdspe->running = new_running_status;
+
+	if (was_running != is_running) {
+		dev_dbg(hdspe->card->dev, "Updating running status: %d\n", is_running ? 1 : 0);
+
+		hdspe->reg.control.common.START = is_running;
+		hdspe_write_control(hdspe);
+		hdspe->reg.status0.common.BUF_PTR = 0;
+	}
+}
+
 /* should I silence all or only opened ones ? doit all for first even is 4MB*/
 static void hdspe_silence_playback(struct hdspe *hdspe)
 {
@@ -575,7 +592,7 @@ _ok:
 	snd_pcm_trigger_done(substream, substream);
 	// Since we have audio interrupts enabled all the time, 
 	// no explicit start or stop is necessary
-	hdspe->running = running;
+	hdspe_update_running_status(hdspe, running);
 	spin_unlock(&hdspe->lock);
 
 	snd_ctl_notify(hdspe->card, SNDRV_CTL_EVENT_MASK_VALUE,

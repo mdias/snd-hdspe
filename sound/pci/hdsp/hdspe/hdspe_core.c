@@ -231,7 +231,9 @@ static void hdspe_start_interrupts(struct hdspe* hdspe)
 		hdspe->reg.control.raw |= m->ie;	
 	}
 
-	hdspe->reg.control.common.START    = true;
+	// NOTE: engine start now will happen dynamically as the PCM device starts.
+	// This does NOT interfere with MIDI functionality. (tested on HDSPe AIO)
+	//hdspe->reg.control.common.START    = true;
 	hdspe->reg.control.common.IE_AUDIO = true;
 
 	hdspe_write_control(hdspe);
